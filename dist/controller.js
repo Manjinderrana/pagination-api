@@ -18,6 +18,7 @@ const client_1 = require("@prisma/client");
 const prisma = new client_1.PrismaClient();
 const perPage = 150;
 let data;
+const delay = () => new Promise(resolve => setTimeout(resolve, 4000));
 fs_1.default.readFile('data.json', 'utf8', (err, jsonString) => {
     if (err) {
         console.error('Error reading JSON file:', err);
@@ -32,20 +33,27 @@ fs_1.default.readFile('data.json', 'utf8', (err, jsonString) => {
 });
 const chunks = (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        for (let i = 0; i < data.length; i += perPage) {
-            setTimeout(() => __awaiter(void 0, void 0, void 0, function* () {
-                const chunked = data.slice(i, i + perPage);
+        let index = 0;
+        while (index < data.length) {
+            const chunked = data.slice(index, index + perPage);
+            try {
                 yield prisma.product.createMany({
-                    data: chunked.flatMap((item) => ({
+                    data: chunked.map((item) => ({
                         name: item === null || item === void 0 ? void 0 : item.name,
                         sku: item === null || item === void 0 ? void 0 : item.sku,
                         product_type: item === null || item === void 0 ? void 0 : item.product_type,
                         categories: item === null || item === void 0 ? void 0 : item.categories,
                         attribute_set_code: item === null || item === void 0 ? void 0 : item.attribute_set_code,
-                        product_websites: item === null || item === void 0 ? void 0 : item.product_websites
-                    }))
+                        product_websites: item === null || item === void 0 ? void 0 : item.product_websites,
+                    })),
                 });
-            }), 5000);
+                console.log(`Inserted chunk starting from index ${index}`);
+            }
+            catch (err) {
+                console.error(`Error inserting chunk starting from index ${index}:`, err);
+            }
+            index += perPage;
+            yield delay();
         }
         res.json({ message: 'data inserted in chunks successfully' });
     }
