@@ -12,50 +12,49 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const express_1 = __importDefault(require("express"));
+exports.chunks = void 0;
 const fs_1 = __importDefault(require("fs"));
 const client_1 = require("@prisma/client");
 const prisma = new client_1.PrismaClient();
-const app = (0, express_1.default)();
-let currentPage = 1;
 const perPage = 150;
-let data = [];
+let data;
 fs_1.default.readFile('data.json', 'utf8', (err, jsonString) => {
     if (err) {
         console.error('Error reading JSON file:', err);
         return;
     }
     try {
-        data = JSON.parse(jsonString);
+        data = ((JSON.parse(jsonString)));
     }
     catch (err) {
         console.error('Error parsing JSON file:', err);
     }
 });
-app.get('/data', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const chunks = (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const startIdx = (currentPage - 1) * perPage;
-        const endIdx = startIdx + perPage;
-        const chunk = data.slice(startIdx, endIdx);
-        yield prisma.product.createMany({
-            data: chunk.map(item => ({
-                sku: item.sku,
-                id: item.id,
-                product_type: item.product_type,
-                attribute_set_code: item.attribute_set_code,
-                product_websites: item.product_websites,
-                categories: item.categories,
-                name: item.name
-            })),
-        });
-        currentPage++;
-        res.json({ data: chunk, currentPage, perPage, });
+        for (let i = 0; i < data.length; i += perPage) {
+            setTimeout(() => __awaiter(void 0, void 0, void 0, function* () {
+                const chunked = data.slice(i, i + perPage);
+                yield prisma.product.createMany({
+                    data: chunked.flatMap((item) => ({
+                        name: item === null || item === void 0 ? void 0 : item.name,
+                        sku: item === null || item === void 0 ? void 0 : item.sku,
+                        product_type: item === null || item === void 0 ? void 0 : item.product_type,
+                        categories: item === null || item === void 0 ? void 0 : item.categories,
+                        attribute_set_code: item === null || item === void 0 ? void 0 : item.attribute_set_code,
+                        product_websites: item === null || item === void 0 ? void 0 : item.product_websites
+                    }))
+                });
+            }), 5000);
+        }
+        res.json({ message: 'data inserted in chunks successfully' });
     }
     catch (error) {
         console.error('Error fetching data:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
-}));
-app.listen(3000, () => {
-    console.log('Server is running on port http://localhost:3000');
+    finally {
+        yield prisma.$disconnect();
+    }
 });
+exports.chunks = chunks;
